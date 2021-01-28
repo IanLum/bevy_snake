@@ -8,8 +8,8 @@ use rand::prelude::random;
 use std::time::Duration;
 use std::collections::HashSet;
 
-const ARENA_WIDTH: u32 = 5;
-const ARENA_HEIGHT: u32 = 5;
+const ARENA_WIDTH: u32 = 20;
+const ARENA_HEIGHT: u32 = 20;
 
 struct BoardPositions(HashSet<Position>);
 impl Default for BoardPositions {
@@ -72,6 +72,8 @@ impl Size {
 
 struct GrowthEvent;
 
+struct FoodSpawnEvent;
+
 struct GameOverEvent;
 
 struct SnakeHead {
@@ -119,37 +121,49 @@ fn position_translation(windows: Res<Windows>, mut q: Query<(&Position, &mut Tra
     }
 }
 
-fn spawn_food(commands: &mut Commands, materials: &Handle<ColorMaterial>) {
-    commands
-        .spawn(SpriteBundle {
-            material: materials.clone(),
-            ..Default::default()
-        })
-        .with(Food)
-        .with(Position {
-            x: (random::<f32>() * ARENA_WIDTH as f32) as i32,
-            y: (random::<f32>() * ARENA_HEIGHT as f32) as i32,
-        })
-        .with(Size::square(0.8));
-}
-
-// fn spawn_food(
-//     commands: &mut Commands,
-//     materials: &Handle<ColorMaterial>,
-//     board_positions: &Handle<BoardPositions>,
-//     positions: Query<&Position, With<Or<(SnakeHead, SnakeSegment)>>>
-// ) {
-//     let positions_hash = positions.iter().collect::<HashSet<_>>();
+// fn spawn_food(commands: &mut Commands, materials: &Handle<ColorMaterial>) {
+//     commands
+//         .spawn(SpriteBundle {
+//             material: materials.clone(),
+//             ..Default::default()
+//         })
+//         .with(Food)
+//         .with(Position {
+//             x: (random::<f32>() * ARENA_WIDTH as f32) as i32,
+//             y: (random::<f32>() * ARENA_HEIGHT as f32) as i32,
+//         })
+//         .with(Size::square(0.8));
 // }
 
-fn respawn_food(
+// fn respawn_food(
+//     commands: &mut Commands,
+//     materials: Res<Materials>,
+//     growth_events: Res<Events<GrowthEvent>>,
+//     mut growth_reader: Local<EventReader<GrowthEvent>>,
+// ) {
+//     if growth_reader.iter(&growth_events).next().is_some() {
+//         spawn_food(commands, &materials.food_material)
+//     }
+// }
+
+fn spawn_food(
     commands: &mut Commands,
     materials: Res<Materials>,
-    growth_events: Res<Events<GrowthEvent>>,
-    mut growth_reader: Local<EventReader<GrowthEvent>>,
+    spawn_events: Res<Events<FoodSpawnEvent>>,
+    mut spawn_reader: Local<EventReader<FoodSpawnEvent>>,
 ) {
-    if growth_reader.iter(&growth_events).next().is_some() {
-        spawn_food(commands, &materials.food_material)
+    if spawn_reader.iter(&spawn_events).next().is_some() {
+        commands
+            .spawn(SpriteBundle {
+                material: materials.food_material.clone(),
+                ..Default::default()
+            })
+            .with(Food)
+            .with(Position {
+                x: (random::<f32>() * ARENA_WIDTH as f32) as i32,
+                y: (random::<f32>() * ARENA_HEIGHT as f32) as i32,
+            })
+            .with(Size::square(0.8));
     }
 }
 
@@ -226,7 +240,7 @@ fn snake_movement(
             || head_pos.x as u32 >= ARENA_WIDTH
             || head_pos.y as u32 >= ARENA_HEIGHT
         {
-            game_over_events.send(GameOverEvent)
+            game_over_events.send(GameOverEvent);
         }
         if segment_positions.contains(&head_pos) {
             game_over_events.send(GameOverEvent);
@@ -245,6 +259,7 @@ fn snake_eating(
     commands: &mut Commands,
     snake_timer: ResMut<SnakeMoveTimer>,
     mut growth_events: ResMut<Events<GrowthEvent>>,
+    mut spawn_events: ResMut<Events<FoodSpawnEvent>>,
     food_positions: Query<(Entity, &Position), With<Food>>,
     head_positions: Query<&Position, With<SnakeHead>>,
 ) {
@@ -256,6 +271,7 @@ fn snake_eating(
             if food_pos == head_pos {
                 commands.despawn(ent);
                 growth_events.send(GrowthEvent);
+                spawn_events.send(FoodSpawnEvent);
             }
         }
     }
@@ -281,6 +297,7 @@ fn snake_growth(
 fn initial_spawn(commands: &mut Commands,
     materials: Res<Materials>,
     mut segments: ResMut<SnakeSegments>,
+    mut spawn_events: ResMut<Events<FoodSpawnEvent>>,
 ) {
     segments.0 = vec![
         commands
@@ -303,7 +320,7 @@ fn initial_spawn(commands: &mut Commands,
         ),
     ];
 
-    spawn_food(commands, &materials.food_material)
+    spawn_events.send(FoodSpawnEvent);
 }
 
 fn game_over(
@@ -314,12 +331,13 @@ fn game_over(
     segments_res: ResMut<SnakeSegments>,
     food: Query<Entity, With<Food>>,
     segments: Query<Entity, With<SnakeSegment>>,
+    spawn_events: ResMut<Events<FoodSpawnEvent>>,
 ) {
     if reader.iter(&game_over_events).next().is_some() {
         for ent in food.iter().chain(segments.iter()) {
             commands.despawn(ent);
         }
-        initial_spawn(commands, materials, segments_res);
+        initial_spawn(commands, materials, segments_res, spawn_events)
     }
 }
 
@@ -349,6 +367,7 @@ fn main() {
         .add_resource(LastTailPosition::default())
         .add_resource(BoardPositions::default())
         .add_event::<GrowthEvent>()
+        .add_event::<FoodSpawnEvent>()
         .add_event::<GameOverEvent>()
         .add_startup_system(setup.system())
         .add_startup_stage("spawn", SystemStage::single(initial_spawn.system()))
@@ -358,7 +377,7 @@ fn main() {
         .add_system(snake_growth.system())
         .add_system(position_translation.system())
         .add_system(size_scaling.system())
-        .add_system(respawn_food.system())
+        .add_system(spawn_food.system())
         .add_system(game_over.system())
         .add_plugins(DefaultPlugins)
         .run();
