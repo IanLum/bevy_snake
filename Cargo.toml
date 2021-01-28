@@ -1,0 +1,11 @@
+[package]
+name = "snake"
+version = "0.1.0"
+authors = ["Ian Lum <ianlum314@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bevy = { version = "0.4.0", features = ["dynamic"] }
+rand = "0.7.3"
