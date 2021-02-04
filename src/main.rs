@@ -19,7 +19,7 @@ fn main() {
         })
         .add_resource(ClearColor(Color::rgb(0.04, 0.04, 0.04)))
         .add_resource(SnakeMoveTimer(Timer::new(
-            Duration::from_millis(300. as u64), //default 150
+            Duration::from_millis(150. as u64), //default 150
             true,
         )))
         .add_resource(SnakeSegments::default())

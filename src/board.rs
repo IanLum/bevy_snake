@@ -2,10 +2,10 @@ use crate::components::*;
 use bevy::prelude::{Query, Res, Sprite, Transform, Vec2, Vec3, Windows};
 use std::collections::HashSet;
 
-pub const ARENA_WIDTH: u32 = 20;
-pub const ARENA_HEIGHT: u32 = 20;
+pub const ARENA_WIDTH: u32 = 15;
+pub const ARENA_HEIGHT: u32 = 15;
 
-pub struct BoardPositions(HashSet<Position>);
+pub struct BoardPositions(pub HashSet<Position>);
 impl Default for BoardPositions {
     fn default() -> Self {
         let mut positions = HashSet::new();
